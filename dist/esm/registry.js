@@ -1,0 +1,18 @@
+export const iconNames = [
+    "bolt",
+    "book",
+    "columns",
+    "dollar",
+    "dots",
+    "file",
+    "gauge",
+    "key",
+    "layers",
+    "megaphone",
+    "search",
+    "shield",
+    "sliders",
+    "target",
+    "userplus",
+    "users",
+];
