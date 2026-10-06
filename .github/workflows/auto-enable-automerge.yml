@@ -1,0 +1,89 @@
+# Turn on GitHub auto-merge for non-draft pull requests to the default branch.
+# When required checks pass, GitHub adds the pull request to the merge queue.
+# This does not approve, add labels, skip checks, or admin-merge.
+#
+# Runs as pull_request_target so the script and workflow that see the
+# avoro-builder private key are the copies on the default branch. The job
+# checks out that branch only. Fork pull requests are skipped.
+#
+# Token: avoro-builder (org variables AVORO_BUILDER_APP_ID and
+# AVORO_BUILDER_INSTALLATION_ID, org secret AVORO_BUILDER_PRIVATE_KEY;
+# AvoroGlobal/keystone docs/agent-credentials.md). GITHUB_TOKEN is not used
+# to enable auto-merge. Events it causes do not start workflow runs, so a
+# merge-queue entry it created would never report required checks.
+
+name: Enable auto-merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+      - edited
+      - labeled
+      - unlabeled
+      - converted_to_draft
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-enable-automerge-${{ github.repository }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  enable:
+    name: Enable auto-merge
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+        github.event.label.name == 'no-auto-merge'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Enable auto-merge for this pull request
+        env:
+          AVORO_BUILDER_APP_ID: ${{ vars.AVORO_BUILDER_APP_ID }}
+          AVORO_BUILDER_INSTALLATION_ID: ${{ vars.AVORO_BUILDER_INSTALLATION_ID }}
+          AVORO_BUILDER_PRIVATE_KEY: ${{ secrets.AVORO_BUILDER_PRIVATE_KEY }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/auto-enable-automerge.mjs
+
+  enroll-open:
+    name: Enroll open pull requests
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Enable auto-merge on open pull requests to the default branch
+        env:
+          AVORO_BUILDER_APP_ID: ${{ vars.AVORO_BUILDER_APP_ID }}
+          AVORO_BUILDER_INSTALLATION_ID: ${{ vars.AVORO_BUILDER_INSTALLATION_ID }}
+          AVORO_BUILDER_PRIVATE_KEY: ${{ secrets.AVORO_BUILDER_PRIVATE_KEY }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          ENROLL_OPEN: "true"
+        run: node scripts/auto-enable-automerge.mjs
