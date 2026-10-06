@@ -1,6 +1,7 @@
 # Turn on GitHub auto-merge for non-draft pull requests to the default branch.
 # When required checks pass, GitHub adds the pull request to the merge queue.
 # This does not approve, add labels, skip checks, or admin-merge.
+# Opt out with the no-auto-merge label, or by saying not to merge in the body.
 #
 # Runs as pull_request_target so the script and workflow that see the
 # avoro-builder private key are the copies on the default branch. The job
@@ -33,23 +34,20 @@ on:
 permissions:
   contents: read
 
-# Do not cancel in progress. A later label event joins this group, and its
-# job is skipped unless the label is no-auto-merge. Cancelling would drop an
-# in-flight enable and leave auto-merge off.
+# One running run and one pending run per pull request. A newer run replaces
+# the pending run and cancels the running run. Every event, including labels,
+# reads the pull request and applies that state, so a label run cannot take
+# the pending slot and then do nothing.
 concurrency:
   group: auto-enable-automerge-${{ github.repository }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   enable:
     name: Enable auto-merge
     if: >-
       github.event_name == 'pull_request_target' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (
-        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-        github.event.label.name == 'no-auto-merge'
-      )
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

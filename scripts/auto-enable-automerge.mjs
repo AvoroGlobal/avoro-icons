@@ -36,7 +36,7 @@ export function decide({
   if (state !== "open") return { action: "skip", reason: "closed" };
   if (draft) return { action: "disable", reason: "draft" };
   if (baseRef !== defaultBranch)
-    return { action: "skip", reason: "off-default-branch" };
+    return { action: "disable", reason: "off-default-branch" };
   const names = Array.isArray(labels)
     ? labels.map((label) => String(label))
     : [];
@@ -168,7 +168,7 @@ export async function mintInstallationToken({
       },
       body: JSON.stringify({
         repositories: [repository],
-        permissions: { pull_requests: "write", contents: "read" },
+        permissions: { pull_requests: "write", contents: "write" },
       }),
     },
   );
@@ -281,7 +281,7 @@ async function applyFetchedPull({ env, request, log, token, repository, pr }) {
     log(
       [
         `auto-merge: could not read branch rules (HTTP ${rulesResponse.status}).`,
-        "avoro-builder can write pull requests and read contents. It cannot read rulesets without Administration: Read.",
+        "avoro-builder can write pull requests and contents. It cannot read rulesets without Administration: Read.",
         "A human must grant the avoro-builder GitHub App Administration: Read (read-only), or grant this workflow's GITHUB_TOKEN administration: read, so the queue merge method can be read.",
         "Refusing to guess a merge method and refusing to enable auto-merge without a merge queue.",
       ].join(" "),
