@@ -33,9 +33,12 @@ on:
 permissions:
   contents: read
 
+# Do not cancel in progress. A later label event joins this group, and its
+# job is skipped unless the label is no-auto-merge. Cancelling would drop an
+# in-flight enable and leave auto-merge off.
 concurrency:
   group: auto-enable-automerge-${{ github.repository }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   enable:

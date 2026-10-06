@@ -36,7 +36,7 @@ export function decide({
   if (state !== "open") return { action: "skip", reason: "closed" };
   if (draft) return { action: "disable", reason: "draft" };
   if (baseRef !== defaultBranch)
-    return { action: "disable", reason: "off-default-branch" };
+    return { action: "skip", reason: "off-default-branch" };
   const names = Array.isArray(labels)
     ? labels.map((label) => String(label))
     : [];
