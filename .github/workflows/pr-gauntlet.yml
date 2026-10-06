@@ -1,0 +1,11 @@
+name: PR gauntlet
+
+on:
+  pull_request:
+  merge_group:
+
+jobs:
+  gauntlet:
+    name: Merge gate
+    uses: AvoroGlobal/keystone/.github/workflows/pr-gauntlet.yml@3423b06dcfd040fae655c50e222856d7dd59d9cc
+    secrets: inherit
