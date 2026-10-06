@@ -20,7 +20,8 @@ export function bodyOptsOut(body) {
   if (/do not merge/i.test(text)) return true;
   // "no merge conflicts" is a status, not an instruction to skip the queue.
   const withoutConflictStatus = text.replace(/no merge conflicts?/gi, "");
-  return /no merge/i.test(withoutConflictStatus);
+  // "no merge" as its own phrase. "no merged" and "no mergeable" do not count.
+  return /no merge(?![a-z])/i.test(withoutConflictStatus);
 }
 
 export function decide({
@@ -102,10 +103,8 @@ export function interpretEnableResult(payload) {
   ) {
     return { ok: false, reason: "allow-auto-merge-disabled", messages };
   }
-  if (
-    /not mergeable|merge conflict|cannot be merged|dirty|unstable/.test(text)
-  ) {
-    return { ok: true, reason: "not-mergeable", messages };
+  if (/not mergeable|merge conflict|cannot be merged/.test(text)) {
+    return { ok: false, reason: "not-mergeable", messages };
   }
   return { ok: false, reason: "enable-failed", messages };
 }
@@ -281,9 +280,8 @@ async function applyFetchedPull({ env, request, log, token, repository, pr }) {
     log(
       [
         `auto-merge: could not read branch rules (HTTP ${rulesResponse.status}).`,
-        "avoro-builder can write pull requests and contents. It cannot read rulesets without Administration: Read.",
-        "A human must grant the avoro-builder GitHub App Administration: Read (read-only), or grant this workflow's GITHUB_TOKEN administration: read, so the queue merge method can be read.",
-        "Refusing to guess a merge method and refusing to enable auto-merge without a merge queue.",
+        "Refusing to enable auto-merge without a confirmed merge queue.",
+        "The token for this job is the existing avoro-builder app, scoped to this repository, with contents:write and pull_requests:write.",
       ].join(" "),
     );
     return {
@@ -303,19 +301,9 @@ async function applyFetchedPull({ env, request, log, token, repository, pr }) {
     };
   }
 
-  const rulesetsById = new Map();
-  for (const rule of rulesResponse.body) {
-    if (rule?.type !== "merge_queue" || rulesetsById.has(rule.ruleset_id))
-      continue;
-    const ruleset = await githubJson(
-      request,
-      token,
-      `/repos/${repository}/rulesets/${rule.ruleset_id}`,
-    );
-    if (ruleset.ok && ruleset.body)
-      rulesetsById.set(rule.ruleset_id, ruleset.body);
-  }
-  const selected = selectMergeMethod(rulesResponse.body, rulesetsById);
+  // The branch rules endpoint returns only rules that are in force. A failed
+  // ruleset lookup must not be treated as an active queue.
+  const selected = selectMergeMethod(rulesResponse.body);
   if (!selected.method) {
     log(
       `auto-merge: not enabling (${selected.reason}). Direct auto-merge stays off when no active merge queue applies.`,
